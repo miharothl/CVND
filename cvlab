@@ -1,0 +1,598 @@
+#!/usr/bin/env python3
+import argparse
+
+import torch
+from matplotlib import transforms
+from torch.utils.data import DataLoader
+
+from cv import drl_logger
+# from cv.experiment.analyser import Analyzer
+# from cv.experiment.configuration import Configuration
+# from cv.experiment.experiment import Experiment
+# from cv.experiment.explorer import Explorer
+from cv.data_load import FacialKeypointsDataset, Rescale, RandomCrop, Normalize, ToTensor
+from cv.logging import init_logging, set_logging_level, transform_verbose_count_to_logging_level
+from models_org import net
+
+
+def parse_arguments(params):
+    ap = argparse.ArgumentParser(description="Reinforcement Learning Lab",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    ap.add_argument("-v", "--verbose", dest="verbose_count",
+                    action="count", default=0,
+                    help="Increases log verbosity for each occurrence.")
+    # ap.add_argument('-t', '--train',
+    #                 action='store_true',
+    #                 help="Train")
+    # ap.add_argument('-f', '--model_filename',
+    #                 default=None,
+    #                 help="Model file")
+    # ap.add_argument('-p', '--play',
+    #                 action='store_true',
+    #                 help="play")
+    # ap.add_argument('-s', '--play_episodes',
+    #                 type=int,
+    #                 default=3,
+    #                 help="number of episodes to play")
+    # ap.add_argument('-e', '--env',
+    #                 default='cartpole',
+    #                 help="Environment")
+    # ap.add_argument('-l', '--list_envs',
+    #                 action='store_true',
+    #                 help="List RL environment")
+    # ap.add_argument('--list_play_ex',
+    #                 action='store_true',
+    #                 help="List play experiments")
+    # ap.add_argument('--list_train_ex',
+    #                 action='store_true',
+    #                 help="List train experiments")
+    # ap.add_argument('--analyse_play_ex',
+    #                 action='store',
+    #                 help="Analyse play experiments")
+    # ap.add_argument('--analyse_compare_epoch_cols',
+    #                 action='store',
+    #                 choices=['avg_score', 'avg_val_score'],
+    #                 help="Analyse train experiments")
+    # ap.add_argument('--exps',
+    #                 nargs='+',
+    #                 action='store',
+    #                 help="Analyse train experiments")
+
+    args = ap.parse_args()
+
+    return args
+
+
+def main():
+    init_logging()
+
+    # params = Configuration().get_app_config()
+    params = {}
+
+    try:
+        args = parse_arguments(params)
+
+        set_logging_level(transform_verbose_count_to_logging_level(args.verbose_count))
+
+        drl_logger.info(
+            "Arguments.",
+            extra={"params": {
+                "arguments": params,
+            }})
+
+        # config = Configuration()
+        # config.set_current_exp_cfg(args.env)
+        # environment = Experiment(config)
+        # explorer = Explorer(config)
+        # analyzer = Analyzer(config, environment.get_session_id())
+        #
+        # if args.list_envs:
+        #     environment.list_envs()
+        # elif args.list_play_ex:
+        #     explorer.list_play_experiments()
+        # elif args.list_train_ex:
+        #     explorer.list_train_experiments()
+        # elif args.analyse_play_ex is not None:
+        #     a = analyzer.play_analysis(args.analyse_play_ex)
+        #     analyzer.log_analysis(a)
+        # elif args.analyse_compare_epoch_cols:
+        #     path = analyzer.compare_train_epoch_cols(args.exps, args.analyse_compare_epoch_cols)
+        #     print(path)
+        # elif args.train:
+        #     environment.train(model=args.model_filename)
+        # elif args.play:
+        #     if args.model_filename is not None:
+        #         environment.play(
+        #             mode='human',
+        #             model=args.model_filename,
+        #             num_episodes=args.play_episodes
+        #         )
+        #     else:
+        #         environment.play_dummy(
+        #             mode='human',
+        #             model=None,
+        #             num_episodes=args.play_episodes
+        #         )
+
+        # Construct the dataset
+        face_dataset = FacialKeypointsDataset(
+            csv_file='./data/training_frames_keypoints.csv',
+            root_dir='./data/training/')
+
+        # print some stats about the dataset
+        print('Length of dataset: ', len(face_dataset))
+
+        # Display a few of the images from the dataset
+        num_to_display = 3
+
+        # import the required libraries
+        import glob
+        import os
+        import numpy as np
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import matplotlib.image as mpimg
+
+        def show_keypoints(image, key_pts):
+            """Show image with keypoints"""
+            plt.imshow(image)
+            plt.scatter(key_pts[:, 0], key_pts[:, 1], s=20, marker='.', c='m')
+
+        fig = plt.figure(figsize=(20, 10))
+
+        for i in range(num_to_display):
+            # define the size of images
+
+            # randomly select a sample
+            rand_i = np.random.randint(0, len(face_dataset))
+            sample = face_dataset[rand_i]
+
+            # print the shape of the image and keypoints
+            print(i, sample['image'].shape, sample['keypoints'].shape)
+
+            ax = plt.subplot(1, num_to_display, i + 1)
+            ax.set_title('Sample #{}'.format(i))
+
+            # Using the same display function, defined earlier
+            show_keypoints(sample['image'], sample['keypoints'])
+
+        plt.savefig('test.png')
+
+        # Transform
+
+        from torchvision import transforms, utils
+
+        # test out some of these transforms
+        rescale = Rescale(100)
+        crop = RandomCrop(50)
+        composed = transforms.Compose([Rescale(250),
+                                       RandomCrop(224)])
+
+        # apply the transforms to a sample image
+        test_num = 500
+        sample = face_dataset[test_num]
+
+        fig = plt.figure()
+        for i, tx in enumerate([rescale, crop, composed]):
+            transformed_sample = tx(sample)
+
+            ax = plt.subplot(1, 3, i + 1)
+            plt.tight_layout()
+            ax.set_title(type(tx).__name__)
+            show_keypoints(transformed_sample['image'], transformed_sample['keypoints'])
+
+        plt.show()
+
+        plt.savefig('test2.png')
+
+        # define the data tranform
+        # order matters! i.e. rescaling should come before a smaller crop
+        data_transform = transforms.Compose([Rescale(250),
+                                             RandomCrop(224),
+                                             Normalize(),
+                                             ToTensor()])
+
+        # create the transformed dataset
+        transformed_dataset = FacialKeypointsDataset(csv_file='./data/training_frames_keypoints.csv',
+                                                     root_dir='./data/training/',
+                                                     transform=data_transform)
+
+        # print some stats about the transformed data
+        print('Number of images: ', len(transformed_dataset))
+
+        # make sure the sample tensors are the expected size
+        for i in range(5):
+            sample = transformed_dataset[i]
+            print(i, sample['image'].size(), sample['keypoints'].size())
+
+        # batch data loader
+        # load training data in batches
+        batch_size = 100
+
+        train_loader = DataLoader(transformed_dataset,
+                                  batch_size=batch_size,
+                                  shuffle=True,
+                                  num_workers=0)
+
+        # load test data in batches
+        batch_size = 10
+
+        # load in the test data, using the dataset class
+        # AND apply the data_transform you defined above
+
+        # create the test dataset
+        test_dataset = FacialKeypointsDataset(csv_file='./data/test_frames_keypoints.csv',
+                                              root_dir='./data/test/',
+                                              transform=data_transform)
+
+        test_loader = DataLoader(test_dataset,
+                                 batch_size=batch_size,
+                                 shuffle=True,
+                                 num_workers=0)
+
+        import torch
+        import torch.nn as nn
+        import torch.nn.functional as F
+
+        ## TODO: Once you've define the network, you can instantiate it
+        # one example conv layer has been provided for you
+
+        from cv.model.model_cv import Net3
+        net = Net3()
+        print(net)
+
+        def net_sample_output():
+
+            # iterate through the test dataset
+            for i, sample in enumerate(test_loader):
+
+                # get sample data: images and ground truth keypoints
+                images = sample['image']
+                key_pts = sample['keypoints']
+
+                # convert images to FloatTensors
+                images = images.type(torch.FloatTensor)
+
+                # forward pass to get net output
+                output_pts = net(images)
+
+                # reshape to batch_size x 68 x 2 pts
+                output_pts = output_pts.view(output_pts.size()[0], 68, -1)
+
+                # break after first image is tested
+                if i == 0:
+                    return images, output_pts, key_pts
+
+        # call the above function
+        # returns: test images, test predicted keypoints, test ground truth keypoints
+        test_images, test_outputs, gt_pts = net_sample_output()
+
+        # print out the dimensions of the data to see if they make sense
+        print(test_images.data.size())
+        print(test_outputs.data.size())
+        print(gt_pts.size())
+
+        #######################################################
+        # train
+        def show_all_keypoints(image, predicted_key_pts, gt_pts=None):
+            """Show image with predicted keypoints"""
+            # image is grayscale
+            plt.imshow(image, cmap='gray')
+            plt.scatter(predicted_key_pts[:, 0], predicted_key_pts[:, 1], s=20, marker='.', c='m')
+            # plot ground truth points as green pts
+            if gt_pts is not None:
+                plt.scatter(gt_pts[:, 0], gt_pts[:, 1], s=20, marker='.', c='g')
+
+        # visualize the output
+        # by default this shows a batch of 10 images
+        def visualize_output(test_images, test_outputs, gt_pts=None, batch_size=10):
+
+            plt.figure(figsize=(20, 10))
+
+            for i in range(batch_size):
+                ax = plt.subplot(1, batch_size, i + 1)
+
+                # un-transform the image data
+                image = test_images[i].data  # get the image from it's Variable wrapper
+                image = image.numpy()  # convert to numpy array from a Tensor
+                image = np.transpose(image, (1, 2, 0))  # transpose to go from torch to numpy image
+
+                # un-transform the predicted key_pts data
+                predicted_key_pts = test_outputs[i].data
+                predicted_key_pts = predicted_key_pts.numpy()
+                # undo normalization of keypoints
+                predicted_key_pts = predicted_key_pts * 50.0 + 100
+
+                # plot ground truth points for comparison, if they exist
+                ground_truth_pts = None
+                if gt_pts is not None:
+                    ground_truth_pts = gt_pts[i]
+                    ground_truth_pts = ground_truth_pts * 50.0 + 100
+
+                # call show_all_keypoints
+                show_all_keypoints(np.squeeze(image), predicted_key_pts, ground_truth_pts)
+
+                plt.axis('off')
+
+            plt.savefig('test3.png')
+
+        # call it
+        visualize_output(test_images, test_outputs, gt_pts)
+
+        #######################################################
+        # train
+        ## TODO: Define the loss and optimization
+        import torch.optim as optim
+
+        criterion = None
+
+        optimizer = None
+
+        ## TODO: specify loss function
+        # cross entropy loss combines softmax and nn.NLLLoss() in one single class.
+        criterion = nn.MSELoss()
+
+        ## TODO: specify optimizer
+        # stochastic gradient descent with a small learning rate
+        # optimizer = optim.SGD(net.parameters(), lr=0.001)
+        optimizer = optim.Adam(net.parameters(), lr=0.001)
+
+        def train_net(n_epochs):
+            # prepare the net for training
+            net.train()
+
+            for epoch in range(n_epochs):  # loop over the dataset multiple times
+
+                running_loss = 0.0
+
+                # train on batches of data, assumes you already have train_loader
+                for batch_i, data in enumerate(train_loader):
+                    # get the input images and their corresponding labels
+                    images = data['image']
+                    key_pts = data['keypoints']
+
+                    # flatten pts
+                    key_pts = key_pts.view(key_pts.size(0), -1)
+
+                    # convert variables to floats for regression loss
+                    key_pts = key_pts.type(torch.FloatTensor)
+                    images = images.type(torch.FloatTensor)
+
+                    # forward pass to get outputs
+                    output_pts = net(images)
+
+                    # calculate the loss between predicted and target keypoints
+                    loss = criterion(output_pts, key_pts)
+
+                    # zero the parameter (weight) gradients
+                    optimizer.zero_grad()
+
+                    # backward pass to calculate the weight gradients
+                    loss.backward()
+
+                    # update the weights
+                    optimizer.step()
+
+                    # print loss statistics
+                    running_loss += loss.item()
+                    if batch_i % 10 == 9:  # print every 10 batches
+                        print('Epoch: {}, Batch: {}, Avg. Loss: {}'.format(epoch + 1, batch_i + 1, running_loss / 10))
+                        running_loss = 0.0
+
+            print('Finished Training')
+
+        # train your network
+        n_epochs = 20  # start small, and increase when you've decided on your model structure and hyperparams
+
+        # this is a Workspaces-specific context manager to keep the connection
+        # alive while training your model, not part of pytorch
+
+        if False:
+            train_net(n_epochs)
+
+        ##########################################################
+        # test
+
+        test_images, test_outputs, gt_pts = net_sample_output()
+
+        print(test_images.data.size())
+        print(test_outputs.data.size())
+        print(gt_pts.size())
+
+        ##########################################################
+        # save
+
+        torch.save(net.state_dict(), './saved_models/model.pt')
+
+        ##########################################################
+        # load
+
+        net = Net3()
+
+        # load the net parameters by name
+        net.load_state_dict(torch.load('./saved_models/model.pt'))
+
+        ######################################################################################################
+        # feature visualization
+
+        # Get the weights in the first conv layer
+        weights = net.conv1.weight.data
+        w = weights.numpy()
+
+        # for 10 filters
+        fig = plt.figure(figsize=(20, 8))
+        columns = 5
+        rows = 2
+        for i in range(0, columns * rows):
+            fig.add_subplot(rows, columns, i + 1)
+            plt.imshow(w[i][0], cmap='gray')
+
+        print('First convolutional layer')
+
+        plt.savefig('test6.png')
+
+        plt.show()
+
+        weights = net.conv2.weight.data
+        w = weights.numpy()
+
+        #######################################################################################
+        # activation maps
+
+        # obtain one batch of testing images
+        dataiter = iter(test_loader)
+        nextiter = dataiter.next()
+        images = nextiter['image']
+        labels = nextiter['keypoints']
+
+        # images, labels = dataiter.next()
+        images = images.numpy()
+
+        # select an image by index
+        idx = 3
+        img = np.squeeze(images[idx])
+
+        # Use OpenCV's filter2D function
+        # apply a specific set of filter weights (like the one's displayed above) to the test image
+
+        import cv2
+        plt.imshow(img, cmap='gray')
+
+        weights = net.conv1.weight.data
+        w = weights.numpy()
+
+        # 1. first conv layer
+        # for 10 filters
+        fig = plt.figure(figsize=(30, 10))
+        columns = 5 * 2
+        rows = 2
+        for i in range(0, columns * rows):
+            fig.add_subplot(rows, columns, i + 1)
+            if ((i % 2) == 0):
+                plt.imshow(w[int(i / 2)][0], cmap='gray')
+            else:
+                c = cv2.filter2D(img, -1, w[int((i - 1) / 2)][0])
+                plt.imshow(c, cmap='gray')
+
+        plt.savefig('test7.png')
+
+        plt.show()
+
+
+        #######################################################################################
+        # second one
+
+        import cv2
+        # load in color image for face detection
+        image = cv2.imread('images/obamas.jpg')
+
+        # switch red and blue color channels
+        # --> by default OpenCV assumes BLUE comes first, not RED as in many images
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+        # plot the image
+        fig = plt.figure(figsize=(9, 9))
+        plt.imshow(image)
+
+        #######################################################################################
+
+        # load in a haar cascade classifier for detecting frontal faces
+        face_cascade = cv2.CascadeClassifier('detector_architectures/haarcascade_frontalface_default.xml')
+
+        # run the detector
+        # the output here is an array of detections; the corners of each detection box
+        # if necessary, modify these parameters until you successfully identify every face in a given image
+        faces = face_cascade.detectMultiScale(image, 1.2, 2)
+
+        # make a copy of the original image to plot detections on
+        image_with_detections = image.copy()
+
+        # loop over the detected faces, mark the image where each face is found
+        for (x, y, w, h) in faces:
+            # draw a rectangle around each detected face
+            # you may also need to change the width of the rectangle drawn depending on image resolution
+            cv2.rectangle(image_with_detections, (x, y), (x + w, y + h), (255, 0, 0), 3)
+
+        fig = plt.figure(figsize=(9, 9))
+
+        plt.imshow(image_with_detections)
+
+        #######################################################################################
+        import torch
+        net = Net3()
+
+        ## TODO: load the best saved model parameters (by your path name)
+        ## You'll need to un-comment the line below and add the correct name for *your* saved model
+        net.load_state_dict(torch.load('saved_models/model.pt'))
+
+        ## print out your net and prepare it for testing (uncomment the line below)
+        net.eval()
+
+        #######################################################################################
+
+        image_copy = np.copy(image)
+
+        # loop over the detected faces from your haar cascade
+        for (x,y,w,h) in faces:
+
+            # Select the region of interest that is the face in the image
+            roi = image_copy[y:y+h, x:x+w]
+
+            ## TODO: Convert the face region from RGB to grayscale
+            gray = cv2.cvtColor(roi, cv2.COLOR_RGB2GRAY)
+
+            ## TODO: Normalize the grayscale image so that its color range falls in [0,1] instead of [0,255]
+            normalized = gray/255.0
+
+            ## TODO: Rescale the detected face to be the expected square size for your CNN (224x224, suggested)
+            resized = cv2.resize(normalized, (224, 224))
+
+            ## TODO: Reshape the numpy image shape (H x W x C) into a torch image shape (C x H x W)
+            resized_with_channel = resized.reshape(resized.shape[0], resized.shape[1], 1)
+
+            print(resized_with_channel.shape)
+
+            ## TODO: Make facial keypoint predictions using your loaded, trained network
+            reshaped = resized_with_channel.transpose((2, 0, 1))
+
+            reshaped = torch.from_numpy(reshaped)
+
+            roi_input = reshaped.unsqueeze(0)
+            roi_input = roi_input.type(torch.FloatTensor)
+
+            keypoints = net(roi_input)
+
+            keypoints = keypoints.view(68, -1)
+
+            keypoints = keypoints.detach().numpy()
+
+            keypoints = keypoints*50.0+100
+
+            show_keypoints(resized, keypoints)
+
+            # ## Display each detected face and the corresponding keypoints
+            # plt.imshow(resized, cmap='gray')
+            # plt.scatter(keypoints[:, 0], keypoints[:, 1], s=5, marker='.', c='m')
+            # plt.axis('off')
+            #
+            # plt.savefig('test8.png')
+
+
+
+        #######################################################################################
+        #######################################################################################
+        #######################################################################################
+    except Exception as e:
+        drl_logger.exception(
+            "Something went wrong :-(",
+            extra={"params": {
+                "exception": e,
+            }})
+
+    finally:
+        pass
+
+
+if __name__ == '__main__':
+    main()
+
