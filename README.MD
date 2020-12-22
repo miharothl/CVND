@@ -32,4 +32,17 @@ pip install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.
 python -m ipykernel install --user --name cvnd --display-name "cvnd"
 
 
+# Project 2
+http://cocodataset.org/
+
+https://github.com/cocodataset/cocoapi.git
+
+conda activate cvnd
+
+pip install cython
+
+cd cocoapi/PythonAPI
+
+make
+
 
