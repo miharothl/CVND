@@ -45,4 +45,28 @@ cd cocoapi/PythonAPI
 
 make
 
+## get data
 
+### project
+
+wget http://images.cocodataset.org/annotations/annotations_trainval2014.zip
+
+http://images.cocodataset.org/zips/train2014.zip
+http://images.cocodataset.org/zips/val2014.zip
+http://images.cocodataset.org/zips/test2014.zip
+
+### cocoapi demo
+
+wget http://images.cocodataset.org/annotations/annotations_trainval2017.zip
+wget http://images.cocodataset.org/zips/train2017.zip
+wget http://images.cocodataset.org/zips/val2017.zip
+wget http://images.cocodataset.org/zips/test2017.zip
+
+
+# check cocoapi notebooks
+
+pip install scikit-image
+
+
+pip install ipywidgets
+jupyter nbextension enable --py widgetsnbextension
