@@ -224,4 +224,24 @@ class DecoderRNN(nn.Module):
 
     def sample(self, inputs, states=None, max_len=20):
         " accepts pre-processed image tensor (inputs) and returns predicted sentence (list of tensor ids of length max_len) "
-        pass 
+
+        """ Generate captions with greedy search """
+        predicted_sentence = []
+
+        for i in range(max_len):
+            # Get output and states from LSTM layer
+            x, states = self.lstm(inputs, states)
+            x = x.squeeze(1)
+
+            # Get output of the linear layer
+            x = self.fc(x)
+
+            # Get the best predicted
+            predicted = x.max(1)[1]
+
+            # Append predicted item to predicted sentence
+            predicted_sentence.append(predicted.item())
+            # Update input for next sequence
+            inputs = self.embeding(predicted).unsqueeze(1)
+
+        return predicted_sentence
