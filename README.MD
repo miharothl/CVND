@@ -27,7 +27,12 @@ pip install torch==1.6.0+cu92 torchvision==0.7.0+cu92 -f https://download.pytorc
 # CPU only
 pip install torch==1.6.0+cpu torchvision==0.7.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
 
+# CUDA 9.0
+wget https://download.pytorch.org/whl/cu90/torch-1.1.0-cp36-cp36m-linux_x86_64.whl
+pip install torch-1.1.0-cp36-cp36m-linux_x86_64.whl
 
+wget https://download.pytorch.org/whl/cu90/torchvision-0.3.0-cp36-cp36m-manylinux1_x86_64.whl
+pip install torchvision-0.3.0-cp36-cp36m-manylinux1_x86_64.whl
 
 python -m ipykernel install --user --name cvnd --display-name "cvnd"
 
