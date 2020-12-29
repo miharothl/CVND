@@ -17,7 +17,7 @@ class Bleu:
         self._hypo_for_image = {}
         self.ref_for_image = {}
 
-    def compute_score(self, gts, res):
+    def compute_score(self, gts, res, verbose):
 
         assert(gts.keys() == res.keys())
         imgIds = gts.keys()
@@ -36,7 +36,7 @@ class Bleu:
             bleu_scorer += (hypo[0], ref)
 
         #score, scores = bleu_scorer.compute_score(option='shortest')
-        score, scores = bleu_scorer.compute_score(option='closest', verbose=1)
+        score, scores = bleu_scorer.compute_score(option='closest', verbose=verbose)
         #score, scores = bleu_scorer.compute_score(option='average', verbose=1)
 
         # return (bleu, bleu_info)
