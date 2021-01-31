@@ -9,3 +9,5 @@ p2-image-captioning/models/encoder-3.pkl filter=lfs diff=lfs merge=lfs -text
 p2-image-captioning/models/decoder-3.pkl filter=lfs diff=lfs merge=lfs -text
 p2-image-captioning/models/decoder-2.pkl filter=lfs diff=lfs merge=lfs -text
 p2-image-captioning/vocab.pkl filter=lfs diff=lfs merge=lfs -text
+p2-image-captioning/models/encoder-21.pkl filter=lfs diff=lfs merge=lfs -text
+p2-image-captioning/models/decoder-21.pkl filter=lfs diff=lfs merge=lfs -text
