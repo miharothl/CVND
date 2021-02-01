@@ -1,5 +1,6 @@
 from math import *
 import random
+import numpy as np
 
 
 ### ------------------------------------- ###
@@ -78,19 +79,32 @@ class robot:
             '''
            
         measurements = []
-        
-        ## TODO: iterate through all of the landmarks in a world
-        
-        ## TODO: For each landmark
-        ## 1. compute dx and dy, the distances between the robot and the landmark
-        ## 2. account for measurement noise by *adding* a noise component to dx and dy
-        ##    - The noise component should be a random value between [-1.0, 1.0)*measurement_noise
-        ##    - Feel free to use the function self.rand() to help calculate this noise component
-        ## 3. If either of the distances, dx or dy, fall outside of the internal var, measurement_range
-        ##    then we cannot record them; if they do fall in the range, then add them to the measurements list
-        ##    as list.append([index, dx, dy]), this format is important for data creation done later
-        
-        ## TODO: return the final, complete list of measurements
+
+        # Iterate through all of the landmarks in a world
+        for idx, landmark in enumerate(self.landmarks):
+
+            # For each landmark
+            # 1. compute dx and dy, the distances between the robot and the landmark
+            dx = landmark[0] - self.x
+            dy = landmark[1] - self.y
+
+            # 2. account for measurement noise by *adding* a noise component to dx and dy
+            #    - The noise component should be a random value between [-1.0, 1.0)*measurement_noise
+            #    - Feel free to use the function self.rand() to help calculate this noise component
+
+            dx += self.rand() * self.measurement_noise
+            dy += self.rand() * self.measurement_noise
+
+            # 3. If either of the distances, dx or dy, fall outside of the internal var, measurement_range
+            #    then we cannot record them; if they do fall in the range, then add them to the measurements list
+            #    as list.append([index, dx, dy]), this format is important for data creation done later
+
+            dist = np.sqrt(dx**2 + dy**2)
+
+            if dist < self.measurement_range:
+                measurements.append([idx, dx, dy])
+
+        # Return the final, complete list of measurements
         return measurements
 
 

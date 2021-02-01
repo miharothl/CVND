@@ -1,0 +1,361 @@
+#!/usr/bin/env python3
+import argparse
+
+import torch
+from matplotlib import transforms
+from torch.utils.data import DataLoader
+
+from cv import drl_logger
+# from cv.experiment.analyser import Analyzer
+# from cv.experiment.configuration import Configuration
+# from cv.experiment.experiment import Experiment
+# from cv.experiment.explorer import Explorer
+from cv.logging import init_logging, set_logging_level, transform_verbose_count_to_logging_level
+
+
+def parse_arguments(params):
+    ap = argparse.ArgumentParser(description="Reinforcement Learning Lab",
+                                 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    ap.add_argument("-v", "--verbose", dest="verbose_count",
+                    action="count", default=0,
+                    help="Increases log verbosity for each occurrence.")
+
+    args = ap.parse_args()
+
+    return args
+
+
+def create_env():
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import random
+
+    from robot_class import robot
+
+
+    world_size = 10.0  # size of world (square)
+    measurement_range = 5.0  # range at which we can sense landmarks
+    measurement_range = 3.0  # range at which we can sense landmarks
+    motion_noise = 0.2  # noise in robot motion
+    measurement_noise = 0.2  # noise in the measurements
+
+    # instantiate a robot, r
+    r = robot(world_size, measurement_range, motion_noise, measurement_noise)
+
+    # print out the location of r
+    print(r)
+
+    ################################################################################
+    ################################################################################
+    # import helper function
+    from helpers import display_world
+
+    # define figure size
+    plt.rcParams["figure.figsize"] = (5,5)
+
+    # call display_world and display the robot in it's grid world
+    print(r)
+    display_world(int(world_size), [r.x, r.y])
+
+    ################################################################################
+    ################################################################################
+    # choose values of dx and dy (negative works, too)
+    dx = 1
+    dy = 2
+    r.move(dx, dy)
+
+    # print out the exact location
+    print(r)
+
+    # display the world after movement, not that this is the same call as before
+    # the robot tracks its own movement
+    display_world(int(world_size), [r.x, r.y])
+
+    ################################################################################
+    ################################################################################
+    # create any number of landmarks
+    num_landmarks = 3
+    r.make_landmarks(num_landmarks)
+
+    # print out our robot's exact location
+    print(r)
+
+    # display the world including these landmarks
+    display_world(int(world_size), [r.x, r.y], r.landmarks)
+
+    # print the locations of the landmarks
+    print('Landmark locations [x,y]: ', r.landmarks)
+
+    ################################################################################
+    ################################################################################
+
+    # try to sense any surrounding landmarks
+    measurements = r.sense()
+    # this will print out an empty list if `sense` has not been implemented
+    print(measurements)
+
+    ################################################################################
+    ################################################################################
+
+    data = []
+
+    # after a robot first senses, then moves (one time step)
+    # that data is appended like so:
+    data.append([measurements, [dx, dy]])
+
+    # for our example movement and measurement
+    print(data)
+
+    ################################################################################
+    ################################################################################
+
+    # in this example, we have only created one time step (0)
+    time_step = 0
+
+    # so you can access robot measurements:
+    print('Measurements: ', data[time_step][0])
+
+    # and its motion for a given time step:
+    print('Motion: ', data[time_step][1])
+
+    ################################################################################
+    ################################################################################
+
+    import numpy as np
+    from helpers import make_data
+
+    # your implementation of slam should work with the following inputs
+    # feel free to change these input values and see how it responds!
+
+    # world parameters
+    num_landmarks = 5  # number of landmarks
+    N = 20  # time steps
+    N = 10  # time steps
+    world_size = 100.0  # size of world (square)
+
+    # robot parameters
+    measurement_range = 50.0  # range at which we can sense landmarks
+    motion_noise = 2.0  # noise in robot motion
+    measurement_noise = 2.0  # noise in the measurements
+    distance = 20.0  # distance by which robot (intends to) move each iteratation
+
+    # make_data instantiates a robot, AND generates random landmarks for a given world size and number of landmarks
+    data = make_data(N, num_landmarks, world_size, measurement_range, motion_noise, measurement_noise, distance)
+
+    ################################################################################
+    ################################################################################
+
+    # print out some stats about the data
+    time_step = 0
+
+    print('Example measurements: \n', data[time_step][0])
+    print('\n')
+    print('Example motion: \n', data[time_step][1])
+
+    ################################################################################
+    ################################################################################
+
+    def initialize_constraints(N, num_landmarks, world_size):
+        ''' This function takes in a number of time steps N, number of landmarks, and a world_size,
+            and returns initialized constraint matrices, omega and xi.'''
+
+        ## Recommended: Define and store the size (rows/cols) of the constraint matrix in a variable
+
+        ## TODO: Define the constraint matrix, Omega, with two initial "strength" values
+        ## for the initial x, y location of our robot
+        # omega = [0]
+
+        ## TODO: Define the constraint *vector*, xi
+        ## you can assume that the robot starts out in the middle of the world with 100% confidence
+        # xi = [0]
+
+        size = (N + num_landmarks) * 2
+
+        omega = np.zeros((size, size))
+        xi = np.zeros((size, 1))
+
+        # add initial pose constraint
+        omega[0][0] = 1
+        omega[1][1] = 1
+
+        xi[0][0] = world_size / 2
+        xi[1][0] = world_size / 2
+
+        return omega, xi
+
+    ################################################################################
+    ################################################################################
+
+    ## TODO: Complete the code to implement SLAM
+
+    ## slam takes in 6 arguments and returns mu,
+    ## mu is the entire path traversed by a robot (all x,y poses) *and* all landmarks locations
+    def slam(data, N, num_landmarks, world_size, motion_noise, measurement_noise):
+        ## TODO: Use your initilization to create constraint matrices, omega and xi
+
+        omega, xi = initialize_constraints(N=N, num_landmarks=num_landmarks, world_size=world_size)
+
+        ## TODO: Iterate through each time step in the data
+        ## get all the motion and measurement data as you iterate
+
+        for i, time_step_data in enumerate(data):
+            measurements = time_step_data[0]
+            motion = time_step_data[1]
+
+            px = 2 * i
+            py = px + 1
+
+            dx = motion[0]
+            dy = motion[1]
+
+            confidence = 1 * 1./motion_noise
+
+            omega[px    , px    ] += confidence
+            omega[px + 2, px + 2] += confidence
+            omega[px    , px + 2] += -confidence
+            omega[px + 2, px    ] += -confidence
+
+            omega[py    , py    ] += confidence
+            omega[py + 2, py + 2] += confidence
+            omega[py    , py + 2] += -confidence
+            omega[py + 2, py    ] += -confidence
+
+            xi[px    , 0] -= dx * confidence
+            xi[px + 2, 0] += dx * confidence
+            xi[py    , 0] -= dy * confidence
+            xi[py + 2, 0] += dy * confidence
+
+            confidence = 1 * 1.0 / measurement_noise
+
+            for measurement in measurements:
+
+                landmark_id = measurement[0]
+                mx = measurement[1]
+                my = measurement[2]
+
+                lx = 2 * N + 2 * landmark_id
+                ly = lx + 1
+
+                omega[px, px] += confidence
+                omega[lx, lx] += confidence
+                omega[px, lx] += -confidence
+                omega[lx, px] += -confidence
+
+                omega[py, py] +=  confidence
+                omega[ly, ly] +=  confidence
+                omega[py, ly] += -confidence
+                omega[ly, py] += -confidence
+
+                xi[px, 0] += -mx / measurement_noise
+                xi[lx, 0] +=  mx / measurement_noise
+                xi[py, 0] += -my / measurement_noise
+                xi[ly, 0] +=  my / measurement_noise
+
+        ## TODO: update the constraint matrix/vector to account for all *measurements*
+        ## this should be a series of additions that take into account the measurement noise
+
+
+        ## TODO: update the constraint matrix/vector to account for all *motion* and motion noise
+
+        ## TODO: After iterating through all the data
+        ## Compute the best estimate of poses and landmark positions
+        ## using the formula, omega_inverse * Xi
+
+        # calculate the inverse of omega
+        omega_inv = np.linalg.inv(np.matrix(omega))
+        # calculate the solution, mu
+        mu = omega_inv*xi
+
+        return mu  # return `mu`
+
+    ################################################################################
+    ################################################################################
+    mu = slam(data, N, num_landmarks, world_size, motion_noise, measurement_noise)
+    ################################################################################
+    ################################################################################
+
+    # a helper function that creates a list of poses and of landmarks for ease of printing
+    # this only works for the suggested constraint architecture of interlaced x,y poses
+    def get_poses_landmarks(mu, N):
+        # create a list of poses
+        poses = []
+        for i in range(N):
+            poses.append((mu[2*i].item(), mu[2*i+1].item()))
+
+        # create a list of landmarks
+        landmarks = []
+        for i in range(num_landmarks):
+            landmarks.append((mu[2*(N+i)].item(), mu[2*(N+i)+1].item()))
+
+        # return completed lists
+        return poses, landmarks
+
+    ################################################################################
+    ################################################################################
+
+    def print_all(poses, landmarks):
+        print('\n')
+        print('Estimated Poses:')
+        for i in range(len(poses)):
+            print('['+', '.join('%.3f'%p for p in poses[i])+']')
+        print('\n')
+        print('Estimated Landmarks:')
+        for i in range(len(landmarks)):
+            print('['+', '.join('%.3f'%l for l in landmarks[i])+']')
+
+    ################################################################################
+    ################################################################################
+
+    # print out the resulting landmarks and poses
+    if (mu is not None):
+        # get the lists of poses and landmarks
+        # and print them out
+        poses, landmarks = get_poses_landmarks(mu, N)
+        print_all(poses, landmarks)
+
+    ################################################################################
+    ################################################################################
+
+    ################################################################################
+    ################################################################################
+
+    ################################################################################
+    ################################################################################
+
+    ################################################################################
+    ################################################################################
+
+
+def main():
+    init_logging()
+
+    # params = Configuration().get_app_config()
+    params = {}
+
+    try:
+        args = parse_arguments(params)
+
+        set_logging_level(transform_verbose_count_to_logging_level(args.verbose_count))
+
+        drl_logger.info(
+            "Arguments.",
+            extra={"params": {
+                "arguments": params,
+            }})
+
+        create_env()
+
+    except Exception as e:
+        drl_logger.exception(
+            "Something went wrong :-(",
+            extra={"params": {
+                "exception": e,
+            }})
+
+    finally:
+        pass
+
+
+if __name__ == '__main__':
+    main()
+
